@@ -1,0 +1,78 @@
+# Makefile to generate .env file
+
+# Define default values for the environment variables
+ENV_FILE=.env
+# API keys
+DEFAULT_LAND_API_KEY=default_api_key
+DEFAULT_LAND_TRADE_API_KEY=default_api_key
+DEFAULT_ECOS_API_KEY=default_api_key
+DEFAULT_KAKAO_API_KEY=default_api_key
+DEFAULT_VWORLD_API_KEY=default_api_key
+DEFAULT_GOOGLE_API_KEY=default_api_key
+
+# Flask config
+DEFAULT_SECRET_KEY=default_secret_key
+DEFAULT_JSON_AS_ASCII=False
+DEFAULT_JWT_SECRET_KEY=default_jwt_secret_key
+DEFAULT_JWT_ACCESS_TOKEN_EXPIRES=360
+DEFAULT_JWT_REFRESH_TOKEN_EXPIRES=720
+DEFAULT_MAIL_SERVER=smtp.gmail.com
+DEFAULT_MAIL_PORT=465
+DEFAULT_MAIL_USERNAME=default_username
+DEFAULT_MAIL_PASSWORD=default_password
+DEFAULT_MAIL_USE_TLS=False
+DEFAULT_MAIL_USE_SSL=True
+DEFAULT_DB_URI=sqlite:///default.db
+DEFAULT_TRACK_MODIFICATIONS=False
+
+# Server
+DEFAULT_SERVER_DOMAIN=localhost
+DEFAULT_SERVER_PORT=5000
+DEFAULT_SERVER_PASSWORD=default_password
+DEFAULT_SSL_CERTIFICATE_PATH=default/ssl/path
+DEFAULT_SSL_KEY_PATH=default/ssl/key_path
+
+# Predict models
+DEFAULT_MODEL_PATH=your_model_path
+
+# Target to create the .env file
+create-env:
+	@echo "Creating .env file..."
+	@echo "LAND_API_KEY=${DEFAULT_LAND_API_KEY}" > $(ENV_FILE)
+	@echo "LAND_TRADE_API_KEY=${DEFAULT_LAND_TRADE_API_KEY}" >> $(ENV_FILE)
+	@echo "ECOS_API_KEY=${DEFAULT_ECOS_API_KEY}" >> $(ENV_FILE)
+	@echo "KAKAO_API_KEY=${DEFAULT_KAKAO_API_KEY}" >> $(ENV_FILE)
+	@echo "VWORLD_API_KEY=${DEFAULT_VWORLD_API_KEY}" >> $(ENV_FILE)
+	@echo "GOOGLE_API_KEY=${DEFAULT_GOOGLE_API_KEY}" >> $(ENV_FILE)
+
+	@echo "SECRET_KEY=${DEFAULT_SECRET_KEY}" >> ${ENV_FILE}
+	@echo "SQLALCHEMY_DATABASE_URI=${DEFAULT_DB_URI}" >> $(ENV_FILE)
+	@echo "SQLALCHEMY_TRACK_MODIFICATIONS=${DEFAULT_TRACK_MODIFICATIONS}" >> $(ENV_FILE)
+	@echo "JSON_AS_ASCII=${DEFAULT_JSON_AS_ASCII}" >> ${ENV_FILE}
+	@echo "JWT_SECRET_KEY=${DEFAULT_JWT_SECRET_KEY}" >> ${ENV_FILE}
+	@echo "JWT_ACCESS_TOKEN_EXPIRES=${DEFAULT_JWT_ACCESS_TOKEN_EXPIRES}" >> ${ENV_FILE}
+	@echo "JWT_REFRESH_TOKEN_EXPIRES=${DEFAULT_JWT_REFRESH_TOKEN_EXPIRES}" >> ${ENV_FILE}
+	@echo "MAIL_SERVER=${DEFAULT_MAIL_SERVER}" >> ${ENV_FILE}
+	@echo "MAIL_PORT=${DEFAULT_MAIL_PORT}" >> ${ENV_FILE}
+	@echo "MAIL_USERNAME=${DEFAULT_MAIL_USERNAME}" >> ${ENV_FILE}
+	@echo "MAIL_PASSWORD=${DEFAULT_MAIL_PASSWORD}" >> ${ENV_FILE}
+	@echo "MAIL_USE_TLS=${DEFAULT_MAIL_USE_TLS}" >> ${ENV_FILE}
+	@echo "MAIL_USE_SSL=${DEFAULT_MAIL_USE_SSL}" >> ${ENV_FILE}
+
+	@echo "SERVER_DOMAIN=${DEFAULT_SERVER_DOMAIN}" >> $(ENV_FILE)
+	@echo "SERVER_PORT=${DEFAULT_SERVER_PORT}" >> $(ENV_FILE)
+	@echo "SERVER_PASSWORD=${DEFAULT_SERVER_PASSWORD}" >> $(ENV_FILE)
+	@echo "SSL_CERTIFICATE_PATH=${DEFAULT_SSL_CERTIFICATE_PATH}" >> $(ENV_FILE)
+	@echo "SSL_KEY_PATH=${DEFAULT_SSL_KEY_PATH}" >> $(ENV_FILE)
+
+	@echo "MODEL_PATH=${DEFAULT_MODEL_PATH}" >> $(ENV_FILE)
+	@echo ".env file created successfully!"
+
+# Target to clean the .env file
+clean-env:
+	@echo "Removing .env file..."
+	@rm -f $(ENV_FILE)
+	@echo ".env file removed successfully!"
+
+# Default target
+all: create-env
