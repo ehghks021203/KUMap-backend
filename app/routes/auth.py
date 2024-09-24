@@ -15,10 +15,15 @@
 ========================================================================================="""
 
 # import libraries
+# import app
 from app import bcrypt, db
+from app.utils.exceptions import *
+from app.utils.decorators import *
 from app.models.user import Users
+# import flask modules
 from flask import Blueprint, request, jsonify
 import flask_jwt_extended
+# import else
 import re
 import pytz
 from datetime import datetime
@@ -27,9 +32,9 @@ auth_routes = Blueprint("auth", __name__)
 
 # END (2024.05.20.)
 @auth_routes.route("/login", methods=["POST"])
+@error_handler()
 def login():
-    """
-    User login function.
+    """User login function.
     
     Params:
         email `str`:
@@ -49,38 +54,17 @@ def login():
         refresh_token `str`:
             JWT refresh token.
     """
-    # Error: Data format is not JSON
-    if not request.is_json:
-        return jsonify({
-            "result":"error", 
-            "msg":"missing json in request",
-            "err_code":"10"
-        }), 400
-    
-    # Error: Required parameter is empty or missing
-    required_fields = ["email", "password"]
-    for field in required_fields:
-        if field not in request.json or not request.json[field]:
-            return jsonify({
-                "result": "error", 
-                "msg": f"missing {field} parameter", 
-                "err_code": "11"
-            }), 400
+    validate_json()
+    validate_json_params("email", "password")
 
     email = request.json["email"]
     password = request.json["password"]
 
     # Query the database for the user
     user = Users.query.filter_by(email=email).first()
-
-    # Error: User does not exist
     if user is None:
-        return jsonify({
-            "result": "error",
-            "msg": "user does not exist",
-            "err_code": "20"
-        }), 401
-    
+        raise UserNotExistException
+
     # Check the password
     if bcrypt.check_password_hash(user.password, password):
         # Update last login
@@ -101,12 +85,7 @@ def login():
             "refresh_token": refresh_token
         }), 200
     else:
-        # Error: Incorrect password
-        return jsonify({
-            "result": "error",
-            "msg": "incorrect password",
-            "err_code": "22"
-        }), 401
+        raise IncorrectPasswordException
 
 # END (2024.05.16.)
 @auth_routes.route("/dup_check", methods=["POST"])

@@ -1,13 +1,17 @@
 from app import db
-from app.models.land import LandInfo
+from app.models.land import LandInfo, LandReport
 from app.functions.pnu_geolocation_lookup import get_pnu, get_word, region_code2name
 from app.functions.predict import pred
+from app.functions.text_generate import generate
+from app.functions.convert_code import code2addr
+from app.functions.get_bid_data import get_bid_land_list_data, get_bid_case_data
 from app.functions.api import LandFeatureAPI, LandUsePlanAPI
 from config import api
 from datetime import datetime
+import json
 import pytz
 
-def get_land_data(lat: float, lng: float) -> dict:
+def get_land_data(pnu) -> dict:
     """위경도 값으로 토지 정보 받아오기
 
     Params:
@@ -49,7 +53,7 @@ def get_land_data(lat: float, lng: float) -> dict:
             bid_data `dict`:
                 토지의 경매 정보 (없다면 null)
     """
-    pnu, address = get_pnu(lat, lng)
+    address = code2addr(pnu)
     if pnu == None or address == None:
         return None
 
@@ -68,8 +72,8 @@ def get_land_data(lat: float, lng: float) -> dict:
         # 데이터 채워넣기
         land["pnu"] = pnu
         target_year = datetime.now(pytz.timezone("Asia/Seoul")).year
-        target_month = datetime.now(pytz.timezone("Asia/Seoul")).month
-        land["predict_land_price"] = str(pred(pnu, target_year, target_month))
+        land["predict_land_price"] = None
+        land["last_predicted_date"] = None
 
         # Get land feature data
         lf_api = LandFeatureAPI(api.LAND_API_KEY)
@@ -96,45 +100,100 @@ def get_land_data(lat: float, lng: float) -> dict:
         new_land = LandInfo[pnu[0:2]](**land)
         db.session.add(new_land)
         db.session.commit()
+
+        bid_data = _get_bid_data(pnu)
         return {
-            "pnu":                  pnu,
-            "addr":                 address,
-            "official_land_price":  land["official_land_price"],
-            "predict_land_price":   land["predict_land_price"],
-            "land_classification":  land["land_classification"],
-            "land_zoning":          land["land_zoning"],
-            "land_use_situation":   land["land_use_situation"],
-            "land_register":        land["land_register"],
-            "land_area":            land["land_area"],
-            "land_height":          land["land_height"],
-            "land_form":            land["land_form"],
-            "road_side":            land["road_side"],
-            "land_uses":            land["land_uses"],
-            "last_predicted_date":  datetime.now(pytz.timezone('Asia/Seoul')).strftime("%Y-%m-%d"),
-            "land_feature_stdr_year":land["land_feature_stdr_year"],
-            "real_price_data":      [],
-            "bid_data":             None,
-            "sale_data":            None,
-            "total_like":           0,
-        }
-    return {
-        "pnu":                  pnu,
-        "addr":                 address,
-        "official_land_price":  land_info.official_land_price,
-        "predict_land_price":   land_info.predict_land_price,
-        "land_classification":  land_info.land_classification,
-        "land_zoning":          land_info.land_zoning,
-        "land_use_situation":   land_info.land_use_situation,
-        "land_register":        land_info.land_register,
-        "land_area":            land_info.land_area,
-        "land_height":          land_info.land_height,
-        "land_form":            land_info.land_form,
-        "road_side":            land_info.road_side,
-        "land_uses":            land_info.land_uses,
-        "last_predicted_date":  land_info.last_predicted_date.strftime("%Y-%m-%d"),
-        "land_feature_stdr_year":land_info.land_feature_stdr_year,
-        "real_price_data":      [],
-        "bid_data":             None,
-        "sale_data":            None,
-        "total_like":           0,
+        "pnu": pnu,
+        "addr": address,
+        "land_info": {
+            "official_land_price": land["official_land_price"],
+            "predict_land_price": land["predict_land_price"],
+            "land_classification": land["land_classification"],
+            "land_zoning": land["land_zoning"],
+            "land_use_situation": land["land_use_situation"],
+            "land_register": land["land_register"],
+            "land_area": land["land_area"],
+            "land_height": land["land_height"],
+            "land_form": land["land_form"],
+            "road_side": land["road_side"],
+            "land_uses": land["land_uses"],
+        },
+        "last_predicted_date": datetime.now(pytz.timezone('Asia/Seoul')).strftime("%Y-%m-%d"),
+        "land_feature_stdr_year": land["land_feature_stdr_year"],
+        "land_trade_list": [],
+        "bid_data": bid_data,
+        "property_data": None,
+        "total_like": 0,
     }
+    bid_data = _get_bid_data(pnu)
+    return {
+        "pnu": pnu,
+        "addr": address,
+        "land_info": {
+            "official_land_price": land_info.official_land_price,
+            "predict_land_price": land_info.predict_land_price,
+            "land_classification": land_info.land_classification,
+            "land_zoning": land_info.land_zoning,
+            "land_use_situation": land_info.land_use_situation,
+            "land_register": land_info.land_register,
+            "land_area": land_info.land_area,
+            "land_height": land_info.land_height,
+            "land_form": land_info.land_form,
+            "road_side": land_info.road_side,
+            "land_uses": land_info.land_uses,
+        },
+        "last_predicted_date": land_info.last_predicted_date.strftime("%Y-%m-%d") if land_info.last_predicted_date else None,
+        "land_feature_stdr_year": land_info.land_feature_stdr_year,
+        "land_trade_list": [],
+        "bid_data": bid_data,
+        "property_data": None,
+        "total_like": 0,
+    }
+
+def set_land_predict_price_data(pnu):
+    land_info = LandInfo[pnu[0:2]].query.filter_by(pnu=pnu).first()
+    if not land_info:
+        # 예외처리 해야함
+        return None
+    target_year = datetime.now(pytz.timezone("Asia/Seoul")).year
+    target_month = datetime.now(pytz.timezone("Asia/Seoul")).month
+    predict_land_price = str(pred(pnu, target_year, target_month))
+    land_info.predict_land_price = predict_land_price
+    land_info.last_predicted_date = datetime.now(pytz.timezone("Asia/Seoul"))
+    db.session.commit()
+
+def _get_bid_data(pnu: str):
+    data = get_bid_land_list_data(pnu[0:2], pnu[2:5])
+    if data != None:
+        for d in data:
+            if d["pnu"] == pnu:
+                lat, lng = get_word(d["addr"]["address"])
+                case_info = get_bid_case_data(d["court_in_charge"], d["case_cd"], d["obj_nm"])
+                d["lat"] = lat
+                d["lng"] = lng
+                d["case_info"] = case_info
+                d["case_info"]["date_list"] = json.loads(d["case_info"]["date_list"])
+                d["case_info"]["land_list"] = json.loads(d["case_info"]["land_list"])
+                
+                return d
+    return None
+
+def get_land_report_data(pnu):
+    pnu_prefix = pnu[:2]
+    if pnu_prefix in LandInfo:
+        LandInfoModel = LandInfo[pnu_prefix]
+        land_info = LandInfoModel.query.filter_by(pnu=pnu).first()
+        if land_info.predict_land_price != None:
+            land_report = LandReport.query.filter_by(pnu=pnu).first()
+    
+            if not land_report:
+                gen_text = generate(pnu, land_info.predict_land_price)
+                new_land_report = LandReport(pnu=pnu, report=gen_text)
+                db.session.add(new_land_report)
+                db.session.commit()
+                return gen_text
+            return land_report.report
+        else:
+            None
+    else:
+        None

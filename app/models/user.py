@@ -18,3 +18,13 @@ class Users(db.Model):
 
     def __repr__(self):
         return f"<User {self.email}>"
+
+class UserLandLike(db.Model):
+    __tablename__ = "user_land_like"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.user_id"), nullable=False)
+    pnu = db.Column(db.String(20), nullable=False)
+
+    def __repr__(self):
+        return f"<UserLandLike(id={self.id}, user_id={self.user_id}, pnu='{self.pnu}')>"

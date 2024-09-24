@@ -24,12 +24,15 @@ class GetGeometryDataAPI():
         if len(pnu) == 19:
             data = "LP_PA_CBND_BUBUN"
             attrFilter = f"pnu:=:{pnu}"
-        elif len(pnu) == 5:
+        elif len(pnu) == 8:
             data = "LT_C_ADEMD_INFO"
             attrFilter = f"emd_cd:LIKE:{pnu}"
-        elif len(pnu) == 2:
+        elif len(pnu) == 5:
             data = "LT_C_ADSIGG_INFO"
             attrFilter = f"sig_cd:LIKE:{pnu}"
+        elif len(pnu) == 2:
+            data = "LT_C_ADSIDO_INFO"
+            attrFilter = f"ctprvn_cd:LIKE:{pnu}"
         
         url = f"{self.endpoint}?service={self.service}&request={self.req}&data={data}&key={self.key}&attrFilter={attrFilter}&page={self.page}&size={self.size}"
         response = json.loads(requests.get(url).text)
@@ -96,7 +99,6 @@ class LandUsePlanAPI():
         params = {"pnu":pnu}
         params.update(self.default_params)
         response = requests.get(self.url, params=params).json()
-        print(response)
         if "landUses" in response:
             datas = response["landUses"]["field"]
             land_use_plan_list = []

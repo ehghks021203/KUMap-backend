@@ -10,4 +10,3 @@ if __name__ == "__main__":
         password=server.SERVER_PASSWORD
     )
     app.run(host=server.SERVER_DOMAIN, port=server.SERVER_PORT, ssl_context=SSL_CONTEXT, debug=True)
-    #app.run(host=Server.SERVER_DOMAIN, port=Server.SERVER_PORT, debug=True)

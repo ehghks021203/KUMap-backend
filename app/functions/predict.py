@@ -4,7 +4,7 @@ import app.functions.make_input_data as mid
 from config import model
 import time
 
-def pred(pnu: str, year: int, month: int) -> int:
+def pred(pnu: str, year: int, month: int, return_all=False) -> int:
     loaded_model = xgb.XGBRegressor()
     loaded_model.load_model(model.MODEL_PATH)
     target_land = mid.make(pnu, f"{year:04d}{month:02d}")
@@ -22,7 +22,10 @@ def pred(pnu: str, year: int, month: int) -> int:
 
     target_x = pd.DataFrame.from_dict(data=[target_feature], orient="columns", dtype=float)
     target_predict = loaded_model.predict(target_x)
-    return int(f"{target_predict[0]:.0f}")
+    if return_all:
+        return target_x, target_predict
+    else:
+        return abs(int(f"{target_predict[0]:.0f}"))/1000*1000
 
 if __name__ == "__main__":
     stt_time = time.time()
