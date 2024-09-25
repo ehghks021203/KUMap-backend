@@ -31,42 +31,6 @@ import requests
 
 user_land_routes = Blueprint("user_land", __name__)
 
-@user_land_routes.route("/land_like", methods=["POST"])
-def LandLike():
-    '''
-    토지 좋아요
-        Params:
-            email `str`
-    '''
-
-    # request 값이 올바르지 않은 경우
-    if not request.is_json:
-        return jsonify({'result':'error', 'msg':'missing json in request'}), 400
-
-    email = request.json.get("email")
-    pnu = request.json.get("pnu")
-
-    # Query for the user using email
-    user = Users.query.filter_by(email=email).first()
-    # If user does not exist
-    if user is None:
-        return jsonify({"result": "error", "msg": "email does not exist"}), 401
-    # Get the user's ID
-    user_id = user.user_id
-    # Check if the land is already liked by the user
-    existing_like = UserLandLike.query.filter_by(user_id=user_id, pnu=pnu).first()
-    if existing_like:
-        # If a like record exists, delete it (unlike)
-        db.session.delete(existing_like)
-        db.session.commit()
-        return jsonify({"result": "success", "msg": "unlike"}), 200
-    else:
-        # If no like record exists, add a new like
-        new_like = UserLandLike(user_id=user_id, pnu=pnu)
-        db.session.add(new_like)
-        db.session.commit()
-        return jsonify({"result": "success", "msg": "like"}), 200
-
 @user_land_routes.route("/load_land_like", methods=["POST"])
 def LoadLandLike():
     '''

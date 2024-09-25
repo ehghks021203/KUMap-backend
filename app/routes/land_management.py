@@ -18,7 +18,7 @@ from app import db
 from app.functions.get_land_data import get_land_data
 from app.functions.pnu_geolocation_lookup import get_pnu, get_word, region_code2name
 from app.functions.api import GetGeometryDataAPI
-from app.models.user import Users
+from app.models.user import Users, UserLandLike
 from app.models.land import LandProperty
 from app.utils.decorators import *
 import os
@@ -28,83 +28,84 @@ sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(os.path.abspath(
 
 land_management_routes = Blueprint("land_management", __name__)
 
-@land_management_routes.route("/user_land_like", methods=["POST"])
-@validation_request("email")
-def user_land_like():
-    """
-    """
-    # Error: Data format is not JSON
+@land_management_routes.route("/land_like", methods=["POST"])
+def LandLike():
+    '''
+    토지 좋아요
+        Params:
+            email `str`
+    '''
+
+    # request 값이 올바르지 않은 경우
     if not request.is_json:
-        return jsonify({
-            "result":"error", 
-            "msg":"missing json in request",
-            "err_code":"10"
-        }), 400
-    
-    # Error: Required parameter is empty or missing
-    required_fields = ["email"]
-    for field in required_fields:
-        if field not in request.json or not request.json[field]:
-            return jsonify({
-                "result": "error", 
-                "msg": f"missing {field} parameter", 
-                "err_code": "11"
-            }), 400
+        return jsonify({'result':'error', 'msg':'missing json in request'}), 400
+
+    email = request.json.get("email")
+    pnu = request.json.get("pnu")
+
+    # Query for the user using email
+    user = Users.query.filter_by(email=email).first()
+    # If user does not exist
+    if user is None:
+        return jsonify({"result": "error", "msg": "email does not exist"}), 401
+    # Get the user's ID
+    user_id = user.user_id
+    # Check if the land is already liked by the user
+    existing_like = UserLandLike.query.filter_by(user_id=user_id, pnu=pnu).first()
+    if existing_like:
+        # If a like record exists, delete it (unlike)
+        db.session.delete(existing_like)
+        db.session.commit()
+        return jsonify({"result": "success", "msg": "unlike"}), 200
+    else:
+        # If no like record exists, add a new like
+        new_like = UserLandLike(user_id=user_id, pnu=pnu)
+        db.session.add(new_like)
+        db.session.commit()
+        return jsonify({"result": "success", "msg": "like"}), 200
 
 @land_management_routes.route("/register_land_property", methods=["POST"])
 @flask_jwt_extended.jwt_required()
 def register_land_property():
-    # request 값이 올바르지 않은 경우
     if not request.is_json:
-        return jsonify({'result':'error', 'msg':'missing json in request'}), 400
-    email = flask_jwt_extended.get_jwt_identity()
+        return jsonify({'result': 'error', 'msg': 'missing json in request'}), 400
 
-    # Query for the user using email
+    email = flask_jwt_extended.get_jwt_identity()
     user = Users.query.filter_by(email=email).first()
 
-    # 유저의 고유번호(id) 불러오기
-    q = f"""
-        SELECT * FROM UserInfo WHERE email='{email}'
-        """
-    user_data = db.executeOne(q)
-
-    # 해당 email이 데이터베이스에 존재하지 않을 경우
-    if user_data == None:
-        return jsonify({"result":"error", "msg":"email does not exist"}), 401
+    if user is None:
+        return jsonify({"result": "error", "msg": "email does not exist"}), 401
     
-    user_id = user_data["user_id"]
+    user_id = user.user_id
 
-    # 토지의 위경도 값을 PNU 코드로 변경
     lat = float(request.json.get("lat"))
     lng = float(request.json.get("lng"))
-    pnu, address = get_pnu(float(lat), float(lng))
+    pnu, address = get_pnu(lat, lng)
 
-    # 매물 등록 여부 확인
-    q = f"""
-        SELECT * FROM land_for_sale WHERE pnu='{pnu}'
-        """
-    land_data = db.executeOne(q)
+    land_data = LandProperty.query.filter_by(pnu=pnu).first()
 
-    # land_for_sale DB에 해당 토지의 매물 데이터가 없을 경우
-    if land_data == None:
+    if land_data is None:
         land_area = request.json.get("land_area")
         land_price = request.json.get("land_price")
         land_summary = request.json.get("land_summary")
 
-        q = """
-            INSERT INTO land_for_sale (pnu, user_id, lat, lng, land_area, land_price, land_summary) VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """
-        db.execute(q, (pnu, user_id, lat, lng, land_area, land_price, land_summary))
-        db.commit()
-        return jsonify({"result":"success", "msg":"register"}), 200
-    # 이미 land_like DB에 해당 유저의 좋아요 데이터가 있을 경우 (좋아요 해제)
+        new_land_property = LandProperty(
+            pnu=pnu,
+            user_id=user_id,
+            lat=lat,
+            lng=lng,
+            area=land_area,
+            price=land_price,
+            summary=land_summary,
+        )
+        db.session.add(new_land_property)
+        db.session.commit()
+        return jsonify({"result": "success", "msg": "register"}), 200
     else:
-        if land_data["user_id"] == user_id:
-            q = """
-                DELETE FROM land_owner WHERE user_id='{}' AND pnu='{}'
-                """.format(user_id, pnu)
-            db.execute(q)
-            db.commit()
-            return jsonify({"result":"success", "msg":"deregister"}), 200
+        if land_data.user_id == user_id:
+            db.session.delete(land_data)
+            db.session.commit()
+            return jsonify({"result": "success", "msg": "deregister"}), 200
         else:
-            return jsonify({"result":"error", "msg":"already register"}), 422
+            return jsonify({"result": "error", "msg": "already registered"}), 422
+        

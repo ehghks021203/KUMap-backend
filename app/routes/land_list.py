@@ -17,6 +17,7 @@ from app import db
 from app.functions.get_land_data import get_land_data
 from app.functions.pnu_geolocation_lookup import get_pnu, get_word, region_code2name
 from app.functions.api import GetGeometryDataAPI
+from app.functions.convert_code import code2addr_dict
 from app.functions.get_bid_data import get_bid_land_list_data, get_bid_case_data
 from app.models.user import Users
 from app.models.land import LandProperty
@@ -29,8 +30,8 @@ sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(os.path.abspath(
 
 land_list_routes = Blueprint("land_list", __name__)
 
-@land_list_routes.route("/get_bid_list", methods=["GET"])
-def get_bid_list():
+@land_list_routes.route("/get_auction_list", methods=["GET"])
+def get_auction_list():
     """경매 목록 조회 함수
     
     Params:
@@ -104,8 +105,6 @@ def get_bid_list():
 
 @land_list_routes.route("/get_land_property_list", methods=["GET"])
 def get_land_property_list():
-
-
     """경매 목록 조회
 
     Params:
@@ -127,29 +126,55 @@ def get_land_property_list():
     # Error: 파라미터 값이 비어있거나 없음
     if not lat or not lng:
         return jsonify({
-            "result":"error", 
-            "msg":"lat or lng parameter missing",
-            "err_code":"11"
+            "result": "error", 
+            "msg": "lat or lng parameter missing",
+            "err_code": "11"
         }), 400
+
     pnu, address = get_pnu(float(lat), float(lng))
     pnu = pnu[0:5]
 
-    land_property_list = db.session.query(Users.name, Users.nickname, LandProperty.pnu, LandProperty.lat, LandProperty.lng, LandProperty.area, LandProperty.price, LandProperty.summary, LandProperty.reg_date)\
-        .join(LandProperty, Users.user_id == LandProperty.user_id)\
-        .filter(LandProperty.pnu.like(f"{pnu}%"))\
-        .all()
+    land_property_list = db.session.query(
+        Users.name,
+        Users.nickname,
+        LandProperty.pnu,
+        LandProperty.lat,
+        LandProperty.lng,
+        LandProperty.area,
+        LandProperty.price,
+        LandProperty.summary,
+        LandProperty.reg_date
+    ).join(LandProperty, Users.user_id == LandProperty.user_id)\
+     .filter(LandProperty.pnu.like(f"{pnu}%"))\
+     .all()
 
+    # 결과를 딕셔너리로 변환
+    land_property_list = [
+        {
+            "name": l[0],
+            "nickname": l[1],
+            "pnu": l[2],
+            "address": code2addr_dict(l[2]),
+            "lat": l[3],
+            "lng": l[4],
+            "land_area": l[5],
+            "land_price": l[6],
+            "land_summary": l[7],
+            "reg_date": l[8].strftime("%Y.%m.%d %H:%M")  # 날짜 형식 변환
+        }
+        for l in land_property_list
+    ]
+
+    # 각 토지 데이터에 추가 정보 추가
     for l in land_property_list:
-        land_response = get_land_data(float(l["lat"]), float(l["lng"]))
+        land_response = get_land_data(l["pnu"])
         l["land_info"] = land_response
-        l["reg_date"] = l["reg_date"].strftime("%Y.%m.%d %H:%M")
     
     return jsonify({
-        "result":"error", 
-        "msg":"get land sale list", 
-        "err_code":"00",
+        "result": "success",  # 성공 응답으로 변경
+        "msg": "get land sale list", 
+        "err_code": "00",
         "data": land_property_list
     }), 200
-
 
 

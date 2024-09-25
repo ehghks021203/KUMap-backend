@@ -1,5 +1,6 @@
 from app import db
-from app.models.land import LandInfo, LandReport
+from app.models.land import LandInfo, LandReport, LandProperty
+from app.models.user import Users
 from app.functions.pnu_geolocation_lookup import get_pnu, get_word, region_code2name
 from app.functions.predict import pred
 from app.functions.text_generate import generate
@@ -102,6 +103,7 @@ def get_land_data(pnu) -> dict:
         db.session.commit()
 
         bid_data = _get_bid_data(pnu)
+        land_property_data = _get_land_property_data(pnu)
         return {
         "pnu": pnu,
         "addr": address,
@@ -122,10 +124,34 @@ def get_land_data(pnu) -> dict:
         "land_feature_stdr_year": land["land_feature_stdr_year"],
         "land_trade_list": [],
         "bid_data": bid_data,
-        "property_data": None,
+        "land_property_data": land_property_data,
         "total_like": 0,
     }
     bid_data = _get_bid_data(pnu)
+    land_property_data = _get_land_property_data(pnu)
+    print({
+        "pnu": pnu,
+        "addr": address,
+        "land_info": {
+            "official_land_price": land_info.official_land_price,
+            "predict_land_price": land_info.predict_land_price,
+            "land_classification": land_info.land_classification,
+            "land_zoning": land_info.land_zoning,
+            "land_use_situation": land_info.land_use_situation,
+            "land_register": land_info.land_register,
+            "land_area": land_info.land_area,
+            "land_height": land_info.land_height,
+            "land_form": land_info.land_form,
+            "road_side": land_info.road_side,
+            "land_uses": land_info.land_uses,
+        },
+        "last_predicted_date": land_info.last_predicted_date.strftime("%Y-%m-%d") if land_info.last_predicted_date else None,
+        "land_feature_stdr_year": land_info.land_feature_stdr_year,
+        "land_trade_list": [],
+        "bid_data": bid_data,
+        "land_property_data": land_property_data,
+        "total_like": 0,
+    })
     return {
         "pnu": pnu,
         "addr": address,
@@ -146,7 +172,7 @@ def get_land_data(pnu) -> dict:
         "land_feature_stdr_year": land_info.land_feature_stdr_year,
         "land_trade_list": [],
         "bid_data": bid_data,
-        "property_data": None,
+        "land_property_data": land_property_data,
         "total_like": 0,
     }
 
@@ -177,6 +203,24 @@ def _get_bid_data(pnu: str):
                 
                 return d
     return None
+
+def _get_land_property_data(pnu: str):
+    land_property_data = LandProperty.query.filter_by(pnu=pnu).first()
+    if not land_property_data:
+        return None
+    else:
+        user = Users.query.filter_by(user_id=land_property_data.user_id).first()
+        data = {
+            "pnu": land_property_data.pnu,
+            "user_id": land_property_data.user_id,
+            "lat": land_property_data.lat,
+            "lng": land_property_data.lng,
+            "land_area": land_property_data.area,
+            "land_price": land_property_data.price,
+            "land_summary": land_property_data.summary,
+            "nickname": user.nickname if user else "알수없음"  # 유저가 없을 경우 None 처리
+        }
+        return data
 
 def get_land_report_data(pnu):
     pnu_prefix = pnu[:2]
